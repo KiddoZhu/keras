@@ -641,6 +641,48 @@ class TFOptimizer(Optimizer):
     def from_config(self, config):
         raise NotImplementedError
 
+def MultiLR(BaseOptimizer):
+    """Class wrapper for multiple learning rate
+    
+    # Arguments
+        BaseOptimizer: base optimizer class.
+    
+    # Returns
+        An Optimizer class that supports argument `lr_multiplier`.
+
+    # Raises
+        ValueError: If `BaseOptimizer` is invalid.
+    """
+    
+    def __init__(self, lr_multiplier={}, *args, **kwargs):
+        super(self.__class__, self).__init__(*args, **kwargs)
+        self.lr_multiplier = lr_multiplier
+    
+    def get_updates(self, params, constraints, loss):
+        updates = []
+        for param in params:
+            if param in self.lr_multiplier:
+                lr = self.lr
+                self.lr *= self.lr_multiplier[param]
+                updates += super(self.__class__, self).get_updates([param], constraints, loss)
+                self.lr = lr
+            else:
+                updates += super(self.__class__, self).get_updates([param], constraints, loss)
+        self.updates = updates
+        return self.updates
+    
+    def get_config(self):
+        config = {'lr_multiplier': self.lr_multiplier}
+        base_config = super(self.__class__, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+    
+    if not isinstance(BaseOptimizer, Optimizer):
+        raise ValueError('Invalid base optimizer', BaseOptimizer)
+    return type('MultiLR' + BaseOptimizer.__name__, (BaseOptimizer,), 
+                {"__init__": __init__,
+                 "get_updates": get_updates,
+                 "get_config": get_config})
+
 
 # Aliases.
 
